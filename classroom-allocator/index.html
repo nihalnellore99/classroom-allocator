@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Classroom Allocator · CSP &amp; Backtracking</title>
+  <meta name="description" content="Classroom allocation as a constraint satisfaction problem, solved with backtracking and with MRV + forward checking. Foundation of AI PBL project.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Foundation of AI · PBL project</span>
+      <h1>Classroom Allocator</h1>
+      <p>Which class goes in which room? Modelled as a constraint satisfaction problem and solved with backtracking, then with backtracking + MRV + forward checking.</p>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" class="tab active" data-tab="solve" aria-selected="true">Solve</button>
+      <button role="tab" class="tab" data-tab="replay" aria-selected="false">Step replay</button>
+      <button role="tab" class="tab" data-tab="bench" aria-selected="false">Benchmark</button>
+      <button role="tab" class="tab" data-tab="about" aria-selected="false">How it works</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ================= SOLVE ================= -->
+    <section id="tab-solve" class="panel" role="tabpanel">
+      <div class="split">
+        <div class="card">
+          <div class="card-head"><h2>Rooms</h2><span id="roomCount" class="muted"></span></div>
+          <div class="scroll limit">
+            <table class="edit" id="roomsTable">
+              <thead><tr><th>Room</th><th>Seats</th><th>Type</th><th class="narrow"></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button id="addRoom" class="ghost" type="button">+ Add room</button>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Courses</h2><span id="courseCount" class="muted"></span></div>
+          <div class="scroll limit">
+            <table class="edit" id="coursesTable">
+              <thead><tr><th>Course</th><th>Students</th><th>Needs</th><th>Slot</th><th class="narrow"></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button id="addCourse" class="ghost" type="button">+ Add course</button>
+        </div>
+      </div>
+
+      <div class="card bar">
+        <div class="seg" role="radiogroup" aria-label="Solver">
+          <label><input type="radio" name="mode" value="both" checked><span>Compare both</span></label>
+          <label><input type="radio" name="mode" value="plain"><span>Plain backtracking</span></label>
+          <label><input type="radio" name="mode" value="smart"><span>MRV + forward checking</span></label>
+        </div>
+        <div class="bar-actions">
+          <button id="loadSample" class="ghost" type="button">Reset to report sample</button>
+          <button id="solveBtn" class="primary" type="button">Solve</button>
+        </div>
+      </div>
+
+      <div id="solveOut" aria-live="polite"></div>
+    </section>
+
+    <!-- ================= REPLAY ================= -->
+    <section id="tab-replay" class="panel" role="tabpanel" hidden>
+      <div class="card bar">
+        <label class="inline">Solver
+          <select id="replaySolver">
+            <option value="smart">MRV + forward checking</option>
+            <option value="plain">Plain backtracking</option>
+          </select>
+        </label>
+        <div class="transport">
+          <button id="rpStart" class="icon-btn" type="button" title="Back to start" aria-label="Back to start">⏮</button>
+          <button id="rpPrev" class="icon-btn" type="button" title="Previous step" aria-label="Previous step">◀</button>
+          <button id="rpPlay" class="icon-btn play" type="button" title="Play / pause" aria-label="Play or pause">▶</button>
+          <button id="rpNext" class="icon-btn" type="button" title="Next step" aria-label="Next step">▶|</button>
+          <button id="rpEnd" class="icon-btn" type="button" title="Jump to end" aria-label="Jump to end">⏭</button>
+        </div>
+        <label class="inline">Speed
+          <select id="rpSpeed">
+            <option value="900">Slow</option>
+            <option value="350" selected>Normal</option>
+            <option value="90">Fast</option>
+            <option value="12">Turbo</option>
+          </select>
+        </label>
+      </div>
+      <div class="card">
+        <input id="rpSlider" class="slider" type="range" min="0" max="0" value="0" aria-label="Replay position">
+        <div class="rp-meta">
+          <span id="rpStep">Step 0 / 0</span>
+          <span id="rpCounters"></span>
+        </div>
+      </div>
+      <div class="split">
+        <div class="card">
+          <div class="card-head"><h2>What the solver is doing</h2></div>
+          <ol id="rpLog" class="log"></ol>
+          <p id="rpNote" class="muted small"></p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Timetable so far</h2></div>
+          <div id="rpGrid" class="scroll"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BENCHMARK ================= -->
+    <section id="tab-bench" class="panel" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-head"><h2>Scaling experiment</h2></div>
+        <p class="lead">Random instances (3 time slots, rooms = courses per slot, so every room is needed). Each instance is built so a valid allocation exists, and every returned solution is re-verified.</p>
+        <div class="form-row">
+          <fieldset class="checks">
+            <legend>Number of courses</legend>
+            <label><input type="checkbox" name="size" value="12"> 12</label>
+            <label><input type="checkbox" name="size" value="18"> 18</label>
+            <label><input type="checkbox" name="size" value="24" checked> 24</label>
+            <label><input type="checkbox" name="size" value="30" checked> 30</label>
+            <label><input type="checkbox" name="size" value="36" checked> 36</label>
+            <label><input type="checkbox" name="size" value="42" checked> 42</label>
+          </fieldset>
+          <label class="inline">Instances per size
+            <input id="bnN" type="number" min="1" max="100" value="20">
+          </label>
+          <label class="inline">Random seed
+            <input id="bnSeed" type="number" value="2026">
+          </label>
+          <button id="bnRun" class="primary" type="button">Run experiment</button>
+        </div>
+        <div id="bnProgress" class="progress" hidden><div></div></div>
+        <p id="bnStatus" class="muted small"></p>
+      </div>
+
+      <div id="bnOut"></div>
+
+      <details class="card ref">
+        <summary>Results printed in the report (Section 7.3), for comparison</summary>
+        <div class="scroll">
+          <table class="data">
+            <thead><tr><th>Courses</th><th>Plain nodes</th><th>Plain backtracks</th><th>Plain ms</th><th>MRV+FC nodes</th><th>MRV+FC backtracks</th><th>MRV+FC ms</th></tr></thead>
+            <tbody>
+              <tr><td>24</td><td>2,173</td><td>258</td><td>1.18</td><td>24.00</td><td>0.00</td><td>0.10</td></tr>
+              <tr><td>30</td><td>24,230</td><td>2,406</td><td>15.59</td><td>30.10</td><td>0.10</td><td>0.15</td></tr>
+              <tr><td>36</td><td>263,065</td><td>21,902</td><td>158.27</td><td>36.20</td><td>0.20</td><td>0.25</td></tr>
+              <tr><td>42</td><td>2,956,380</td><td>211,147</td><td>2125.23</td><td>42.25</td><td>0.25</td><td>0.38</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted small">The report's instance generator is not part of its appendix, so this page uses its own seeded generator. Absolute numbers differ; the pattern (plain search explodes, MRV + forward checking stays near one node per course) is the same.</p>
+      </details>
+    </section>
+
+    <!-- ================= ABOUT ================= -->
+    <section id="tab-about" class="panel" role="tabpanel" hidden>
+      <div class="card prose">
+        <h2>The problem</h2>
+        <p>Every course has a class size, a required room type and a fixed time slot. Every room has a capacity and a type. Give each course exactly one room so that:</p>
+        <ul>
+          <li><b>Capacity</b>: the room has at least as many seats as the course has students.</li>
+          <li><b>Type</b>: labs need a lab, halls need a hall, ordinary lectures can use a lecture room or a hall.</li>
+          <li><b>No double booking</b>: two courses in the same slot never share a room.</li>
+        </ul>
+
+        <h2>As a CSP</h2>
+        <div class="scroll">
+          <table class="data">
+            <thead><tr><th>Component</th><th>In this project</th></tr></thead>
+            <tbody>
+              <tr><td>Variables</td><td>One per course, e.g. CS101, MA101, CS102L</td></tr>
+              <tr><td>Domain</td><td>Rooms that satisfy the course's capacity and type (unary constraints, applied up front)</td></tr>
+              <tr><td>Binary constraint</td><td>For two courses in the same slot: room(Ci) ≠ room(Cj)</td></tr>
+              <tr><td>Solution</td><td>A complete assignment that violates nothing</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Because each course has a fixed slot, slots never interact: the constraint graph is one independent all-different cluster per slot.</p>
+
+        <h2>Backtracking</h2>
+<pre>BACKTRACK(assignment):
+  if assignment is complete: return assignment
+  c = SELECT-UNASSIGNED-COURSE()
+  for each room r in DOMAIN(c):
+    if r is consistent with assignment:
+      add (c = r) to assignment
+      result = BACKTRACK(assignment)
+      if result is not failure: return result
+      remove (c = r) from assignment      # backtrack
+  return failure</pre>
+        <p><b>Plain</b> uses a fixed course order (by slot, ordinary lectures first) and only checks constraints when a room is assigned, so mistakes are found late.</p>
+        <p><b>MRV + forward checking</b> always picks the course with the fewest legal rooms left (fail-first), and after each placement removes that room from every unassigned course in the same slot. An empty domain triggers an immediate backtrack.</p>
+
+        <h2>Counting effort</h2>
+        <p>A <b>node</b> is one (course, room) attempt. A <b>backtrack</b> is one attempt that had to be undone. Both are counted exactly as in the report's Python code, and the Solve tab reproduces the report's sample: 138 nodes / 4 backtracks for plain, 24 nodes / 0 backtracks for MRV + forward checking.</p>
+
+        <h2>Honest limitations</h2>
+        <ul>
+          <li>With fixed slots, this exact version is also solvable in polynomial time by bipartite matching. Backtracking is used because it is the course technique and it keeps working when constraints are added that break matching (lecturer clashes, building preferences, slot as a variable).</li>
+          <li>The solver returns the first valid allocation, not the best one, and handles hard constraints only.</li>
+          <li>Worst case is still exponential; timetabling is NP-complete in general (Even, Itai and Shamir, 1976).</li>
+        </ul>
+
+        <h2>References</h2>
+        <ul class="small">
+          <li>Russell and Norvig, <i>Artificial Intelligence: A Modern Approach</i>, 4th ed., Ch. 6.</li>
+          <li>Even, Itai and Shamir, "On the complexity of timetable and multicommodity flow problems", SIAM J. Computing, 1976.</li>
+          <li>Haralick and Elliott, "Increasing tree search efficiency for constraint satisfaction problems", Artificial Intelligence, 1980.</li>
+          <li>Mackworth, "Consistency in networks of relations", Artificial Intelligence, 1977.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Based on the PBL report <i>Classroom Allocation using Backtracking</i>. Everything runs in your browser; nothing is uploaded.
+  </footer>
+
+  <script src="solver.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
